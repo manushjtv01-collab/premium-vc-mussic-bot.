@@ -23,7 +23,7 @@ app = Client(
     session_string=SESSION_STRING
 )
 
-# Initialize PyTgCalls v3
+# Initialize PyTgCalls
 call_py = PyTgCalls(app)
 active_calls = set()
 
@@ -151,7 +151,7 @@ async def main():
     os.makedirs("downloads", exist_ok=True)
     print("Starting Pyrofork Client...")
     await app.start()
-    print("Starting PyTgCalls...")
+    print("Starting PyTgCalls v3...")
     await call_py.start()
     print("Music Bot is Online and Running!")
     await idle()
