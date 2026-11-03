@@ -3,7 +3,7 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pytgcalls import PyTgCalls, idle
-from pytgcalls.types import AudioPiped
+from pytgcalls.types.input_stream import AudioPiped
 import yt_dlp
 
 # Environment variables from GitHub Secrets
