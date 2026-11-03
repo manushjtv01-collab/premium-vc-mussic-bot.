@@ -1,18 +1,22 @@
 import os
-import asyncio
-
 from pyrogram import Client, filters
 from pytgcalls import PyTgCalls
 from pytgcalls.types import MediaStream
 
 
-# Telegram Credentials
+# =========================
+# TELEGRAM CREDENTIALS
+# =========================
+
 API_ID = int(os.environ["API_ID"])
 API_HASH = os.environ["API_HASH"]
 SESSION = os.environ["SESSION_STRING"]
 
 
-# Client Setup
+# =========================
+# CLIENT SETUP
+# =========================
+
 app = Client(
     "PremiumMusic",
     api_id=API_ID,
@@ -23,7 +27,10 @@ app = Client(
 call = PyTgCalls(app)
 
 
-# Start Command
+# =========================
+# START COMMAND
+# =========================
+
 @app.on_message(filters.command("start"))
 async def start(_, message):
     await message.reply_text(
@@ -36,7 +43,10 @@ async def start(_, message):
     )
 
 
-# Play Telegram MP3
+# =========================
+# PLAY MP3 COMMAND
+# =========================
+
 @app.on_message(filters.command("play"))
 async def play(_, message):
 
@@ -71,8 +81,10 @@ async def play(_, message):
     try:
         os.makedirs("downloads", exist_ok=True)
 
-        safe_name = f"{message.chat.id}_{replied.id}.mp3"
-        file_path = os.path.join("downloads", safe_name)
+        file_path = os.path.join(
+            "downloads",
+            f"{message.chat.id}_{replied.id}.mp3"
+        )
 
         downloaded = await replied.download(
             file_name=file_path
@@ -86,59 +98,3 @@ async def play(_, message):
         await call.play(
             message.chat.id,
             MediaStream(downloaded)
-        )
-
-        await status.edit_text(
-            f"🎵 Playing: {filename}"
-        )
-
-    except Exception as e:
-        await status.edit_text(
-            f"❌ Error: {str(e)}"
-        )
-
-
-# Pause
-@app.on_message(filters.command("pause"))
-async def pause(_, message):
-    try:
-        await call.pause(message.chat.id)
-        await message.reply_text("⏸ Music Paused!")
-    except Exception as e:
-        await message.reply_text(f"❌ Error: {e}")
-
-
-# Resume
-@app.on_message(filters.command("resume"))
-async def resume(_, message):
-    try:
-        await call.resume(message.chat.id)
-        await message.reply_text("▶️ Music Resumed!")
-    except Exception as e:
-        await message.reply_text(f"❌ Error: {e}")
-
-
-# Stop
-@app.on_message(filters.command("stop"))
-async def stop(_, message):
-    try:
-        await call.leave_call(message.chat.id)
-        await message.reply_text("⏹ Music Stopped!")
-    except Exception as e:
-        await message.reply_text(f"❌ Error: {e}")
-
-
-# Volume
-@app.on_message(filters.command("volume"))
-async def volume(_, message):
-    try:
-        if len(message.command) < 2:
-            return await message.reply_text(
-                "Usage: /volume 1-200"
-            )
-
-        value = int(message.command[1])
-
-        if not 1 <= value <= 200:
-            return await message.reply_text(
-                "Volume 1 se 
