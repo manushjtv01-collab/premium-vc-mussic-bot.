@@ -1,100 +1,139 @@
 import os
+import asyncio
 from pyrogram import Client, filters
+from pyrogram.types import Message
 from pytgcalls import PyTgCalls
-from pytgcalls.types import MediaStream
+from pytgcalls.types import AudioPiped
+import yt_dlp
 
+# GitHub Secrets se credentials uthana
+API_ID = os.getenv("API_ID")
+API_HASH = os.getenv("API_HASH")
+SESSION_STRING = os.getenv("SESSION_STRING")
 
-# =========================
-# TELEGRAM CREDENTIALS
-# =========================
+if not API_ID or not API_HASH or not SESSION_STRING:
+    print("Error: API_ID, API_HASH, or SESSION_STRING is missing in environment variables/secrets!")
+    exit(1)
 
-API_ID = int(os.environ["API_ID"])
-API_HASH = os.environ["API_HASH"]
-SESSION = os.environ["SESSION_STRING"]
-
-
-# =========================
-# CLIENT SETUP
-# =========================
-
+# Pyrogram Client Setup (Userbot session string ke sath)
 app = Client(
-    "PremiumMusic",
-    api_id=API_ID,
+    "music_bot",
+    api_id=int(API_ID),
     api_hash=API_HASH,
-    session_string=SESSION
+    session_string=SESSION_STRING
 )
 
-call = PyTgCalls(app)
+# PyTgCalls Setup
+call_py = PyTgCalls(app)
 
-
-# =========================
-# START COMMAND
-# =========================
-
+# /start command
 @app.on_message(filters.command("start"))
-async def start(_, message):
+async def start_handler(client: Client, message: Message):
     await message.reply_text(
-        "🎵 PREMIUM VC MUSIC BOT\n\n"
-        "MP3 file par reply karke /play bhejo.\n\n"
-        "/pause - Pause music\n"
-        "/resume - Resume music\n"
-        "/stop - Stop music\n"
-        "/volume 50 - Change volume"
+        "👋 **Hello! Main aapka Telegram Voice Chat Music Bot hoon.**\n\n"
+        "Commands:\n"
+        "• `/play [YouTube Link / Song Name]` - Voice chat me music play karne ke liye\n"
+        "• `/pause` - Music pause karne ke liye\n"
+        "• `/resume` - Music resume karne ke liye\n"
+        "• `/stop` - Voice chat band karne ke liye\n"
+        "• `/volume [1-200]` - Volume set karne ke liye"
     )
 
-
-# =========================
-# PLAY MP3 COMMAND
-# =========================
-
+# /play command (YouTube links & Search & Local audio support)
 @app.on_message(filters.command("play"))
-async def play(_, message):
+async def play_handler(client: Client, message: Message):
+    if len(message.command) < 2:
+        await message.reply_text("⚠️ Kripya koi YouTube link ya song name dein! Example: `/play Faded`")
+        return
 
-    replied = message.reply_to_message
-
-    if not replied:
-        return await message.reply_text(
-            "❌ MP3 file par reply karke /play bhejo."
-        )
-
-    audio = replied.audio
-    document = replied.document
-
-    if audio:
-        filename = audio.file_name or "music.mp3"
-
-    elif document and (
-        document.mime_type == "audio/mpeg"
-        or (document.file_name or "").lower().endswith(".mp3")
-    ):
-        filename = document.file_name or "music.mp3"
-
-    else:
-        return await message.reply_text(
-            "❌ Please reply to an MP3 file."
-        )
-
-    status = await message.reply_text(
-        "⏳ Downloading MP3..."
-    )
+    query = " ".join(message.command[1:])
+    chat_id = message.chat.id
+    m = await message.reply_text("🔍 **Searching & Processing audio...**")
 
     try:
-        os.makedirs("downloads", exist_ok=True)
+        # yt-dlp options se direct audio stream URL nikalna
+        ydl_opts = {
+            "format": "bestaudio/best",
+            "quiet": True,
+            "geo_bypass": True,
+            "nocheckcertificate": True,
+        }
+        
+        if query.startswith("http"):
+            search_query = query
+        else:
+            search_query = f"ytsearch:{query}"
 
-        file_path = os.path.join(
-            "downloads",
-            f"{message.chat.id}_{replied.id}.mp3"
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(search_query, download=False)
+            if "entries" in info:
+                info = info["entries"][0]
+            
+            stream_url = info.get("url")
+            title = info.get("title", "Unknown Title")
+
+        await m.edit_text(f"🎵 **Playing:** `{title}`")
+        
+        # PyTgCalls ke zariye Voice Chat me audio stream play karna
+        await call_py.join_group_call(
+            chat_id,
+            AudioPiped(stream_url)
         )
+    except Exception as e:
+        await m.edit_text(f"❌ Error aa gaya: `{e}`")
 
-        downloaded = await replied.download(
-            file_name=file_path
-        )
+# /pause command
+@app.on_message(filters.command("pause"))
+async def pause_handler(client: Client, message: Message):
+    try:
+        await call_py.pause_stream(message.chat.id)
+        await message.reply_text("⏸ **Music Paused.**")
+    except Exception as e:
+        await message.reply_text(f"❌ Error: `{e}`")
 
-        if not downloaded:
-            return await status.edit_text(
-                "❌ MP3 download failed."
-            )
+# /resume command
+@app.on_message(filters.command("resume"))
+async def resume_handler(client: Client, message: Message):
+    try:
+        await call_py.resume_stream(message.chat.id)
+        await message.reply_text("▶️ **Music Resumed.**")
+    except Exception as e:
+        await message.reply_text(f"❌ Error: `{e}`")
 
-        await call.play(
-            message.chat.id,
-            MediaStream(downloaded)
+# /stop command
+@app.on_message(filters.command("stop"))
+async def stop_handler(client: Client, message: Message):
+    try:
+        await call_py.leave_group_call(message.chat.id)
+        await message.reply_text("⏹ **Stopped and Left Voice Chat.**")
+    except Exception as e:
+        await message.reply_text(f"❌ Error: `{e}`")
+
+# /volume command
+@app.on_message(filters.command("volume"))
+async def volume_handler(client: Client, message: Message):
+    if len(message.command) < 2:
+        await message.reply_text("⚠️ Usage: `/volume 100` (1 se 200 tak)")
+        return
+    try:
+        vol = int(message.command[1])
+        if 1 <= vol <= 200:
+            await call_py.change_volume_call(message.chat.id, vol)
+            await message.reply_text(f"🔊 **Volume set to {vol}%**")
+        else:
+            await message.reply_text("⚠️ Volume 1 aur 200 ke beech honi chahiye!")
+    except Exception as e:
+        await message.reply_text(f"❌ Error: `{e}`")
+
+async def main():
+    print("Starting Pyrogram Client & PyTgCalls...")
+    await app.start()
+    await call_py.start()
+    print("Bot is running successfully!")
+    # Bot ko chalu rakhne ke liye idle loop
+    await asyncio.gather(
+        asyncio.Event().wait()
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())
