@@ -1,7 +1,7 @@
 import os
 import asyncio
-from pyrofork import Client, filters
-from pyrofork.types import Message
+from pyrogram import Client, filters
+from pyrogram.types import Message
 from pytgcalls import PyTgCalls, idle
 from pytgcalls.types.input_stream import AudioPiped
 import yt_dlp
@@ -15,7 +15,7 @@ if not API_ID or not API_HASH or not SESSION_STRING:
     print("Error: API_ID, API_HASH, and SESSION_STRING must be set!")
     exit(1)
 
-# Initialize Pyrofork Client
+# Initialize Pyrogram Client
 app = Client(
     "music_bot",
     api_id=API_ID,
@@ -149,9 +149,9 @@ async def volume_cmd(client: Client, message: Message):
 
 async def main():
     os.makedirs("downloads", exist_ok=True)
-    print("Starting Pyrofork Client...")
+    print("Starting Pyrogram Client...")
     await app.start()
-    print("Starting PyTgCalls v3...")
+    print("Starting PyTgCalls...")
     await call_py.start()
     print("Music Bot is Online and Running!")
     await idle()
