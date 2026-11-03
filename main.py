@@ -1,6 +1,5 @@
 import os
 import asyncio
-import yt_dlp
 
 from pyrogram import Client, filters
 from pytgcalls import PyTgCalls
@@ -13,7 +12,7 @@ API_HASH = os.environ["API_HASH"]
 SESSION = os.environ["SESSION_STRING"]
 
 
-# Bot Setup
+# Client Setup
 app = Client(
     "PremiumMusic",
     api_id=API_ID,
@@ -29,66 +28,77 @@ call = PyTgCalls(app)
 async def start(_, message):
     await message.reply_text(
         "🎵 PREMIUM VC MUSIC BOT\n\n"
-        "/play song name or YouTube link\n"
+        "MP3 file par reply karke /play bhejo.\n\n"
         "/pause - Pause music\n"
         "/resume - Resume music\n"
-        "/skip - Skip music\n"
         "/stop - Stop music\n"
         "/volume 50 - Change volume"
     )
 
 
-# Search and Play
+# Play Telegram MP3
 @app.on_message(filters.command("play"))
 async def play(_, message):
 
-    if len(message.command) < 2:
+    replied = message.reply_to_message
+
+    if not replied:
         return await message.reply_text(
-            "Usage: /play song name or YouTube link"
+            "❌ MP3 file par reply karke /play bhejo."
         )
 
-    query = " ".join(message.command[1:])
+    audio = replied.audio
+    document = replied.document
 
-    status = await message.reply_text("🔎 Searching song...")
+    if audio:
+        filename = audio.file_name or "music.mp3"
 
-    def get_audio():
-        options = {
-            "format": "bestaudio/best",
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True
-        }
+    elif document and (
+        document.mime_type == "audio/mpeg"
+        or (document.file_name or "").lower().endswith(".mp3")
+    ):
+        filename = document.file_name or "music.mp3"
 
-        with yt_dlp.YoutubeDL(options) as ydl:
+    else:
+        return await message.reply_text(
+            "❌ Please reply to an MP3 file."
+        )
 
-            if query.startswith(("http://", "https://")):
-                info = ydl.extract_info(query, download=False)
-            else:
-                result = ydl.extract_info(
-                    f"ytsearch1:{query}",
-                    download=False
-                )
-                info = result["entries"][0]
-
-            return info["url"], info.get("title", "Unknown")
+    status = await message.reply_text(
+        "⏳ Downloading MP3..."
+    )
 
     try:
-        url, title = await asyncio.to_thread(get_audio)
+        os.makedirs("downloads", exist_ok=True)
+
+        safe_name = f"{message.chat.id}_{replied.id}.mp3"
+        file_path = os.path.join("downloads", safe_name)
+
+        downloaded = await replied.download(
+            file_name=file_path
+        )
+
+        if not downloaded:
+            return await status.edit_text(
+                "❌ MP3 download failed."
+            )
 
         await call.play(
             message.chat.id,
-            MediaStream(url)
+            MediaStream(downloaded)
         )
 
         await status.edit_text(
-            f"🎵 Now Playing:\n{title}"
+            f"🎵 Playing: {filename}"
         )
 
     except Exception as e:
-        await status.edit_text(f"❌ Error: {e}")
+        await status.edit_text(
+            f"❌ Error: {str(e)}"
+        )
 
 
-# Pause Command
+# Pause
 @app.on_message(filters.command("pause"))
 async def pause(_, message):
     try:
@@ -98,7 +108,7 @@ async def pause(_, message):
         await message.reply_text(f"❌ Error: {e}")
 
 
-# Resume Command
+# Resume
 @app.on_message(filters.command("resume"))
 async def resume(_, message):
     try:
@@ -108,17 +118,7 @@ async def resume(_, message):
         await message.reply_text(f"❌ Error: {e}")
 
 
-# Skip Command
-@app.on_message(filters.command("skip"))
-async def skip(_, message):
-    try:
-        await call.leave_call(message.chat.id)
-        await message.reply_text("⏭ Music Skipped!")
-    except Exception as e:
-        await message.reply_text(f"❌ Error: {e}")
-
-
-# Stop Command
+# Stop
 @app.on_message(filters.command("stop"))
 async def stop(_, message):
     try:
@@ -128,7 +128,7 @@ async def stop(_, message):
         await message.reply_text(f"❌ Error: {e}")
 
 
-# Volume Command
+# Volume
 @app.on_message(filters.command("volume"))
 async def volume(_, message):
     try:
@@ -141,21 +141,4 @@ async def volume(_, message):
 
         if not 1 <= value <= 200:
             return await message.reply_text(
-                "Volume must be between 1 and 200."
-            )
-
-        await call.change_volume_call(
-            message.chat.id,
-            value
-        )
-
-        await message.reply_text(
-            f"🔊 Volume: {value}%"
-        )
-
-    except Exception as e:
-        await message.reply_text(f"❌ Error: {e}")
-
-
-# Run Bot
-call.run()
+                "Volume 1 se 
