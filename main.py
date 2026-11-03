@@ -3,7 +3,7 @@ import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
 from pytgcalls import PyTgCalls, idle
-from pytgcalls.types.input_stream import AudioPiped
+from pytgcalls import MediaStream
 import yt_dlp
 
 # Environment variables from GitHub Secrets
@@ -23,7 +23,7 @@ app = Client(
     session_string=SESSION_STRING
 )
 
-# Initialize PyTgCalls
+# Initialize PyTgCalls v3
 call_py = PyTgCalls(app)
 active_calls = set()
 
@@ -72,9 +72,9 @@ async def play_cmd(client: Client, message: Message):
         file_path = await message.reply_to_message.download(file_name="downloads/")
         await m.edit("🎵 Joining Voice Chat and playing...")
         try:
-            await call_py.join_group_call(
+            await call_py.play(
                 chat_id,
-                AudioPiped(file_path)
+                MediaStream(file_path)
             )
             active_calls.add(chat_id)
             await m.edit("▶️ **Playing audio file in Voice Chat!**")
@@ -94,9 +94,9 @@ async def play_cmd(client: Client, message: Message):
         file_path = await loop.run_in_executor(None, download_audio, query)
         
         await m.edit("🎵 Joining Voice Chat and streaming...")
-        await call_py.join_group_call(
+        await call_py.play(
             chat_id,
-            AudioPiped(file_path)
+            MediaStream(file_path)
         )
         active_calls.add(chat_id)
         await m.edit(f"▶️ **Now Playing:** `{query}`")
@@ -107,7 +107,7 @@ async def play_cmd(client: Client, message: Message):
 async def pause_cmd(client: Client, message: Message):
     chat_id = message.chat.id
     try:
-        await call_py.pause_stream(chat_id)
+        await call_py.pause(chat_id)
         await message.reply_text("⏸ **Paused the music.**")
     except Exception as e:
         await message.reply_text(f"❌ Error: {str(e)}")
@@ -116,7 +116,7 @@ async def pause_cmd(client: Client, message: Message):
 async def resume_cmd(client: Client, message: Message):
     chat_id = message.chat.id
     try:
-        await call_py.resume_stream(chat_id)
+        await call_py.resume(chat_id)
         await message.reply_text("▶️ **Resumed the music.**")
     except Exception as e:
         await message.reply_text(f"❌ Error: {str(e)}")
@@ -125,7 +125,7 @@ async def resume_cmd(client: Client, message: Message):
 async def stop_cmd(client: Client, message: Message):
     chat_id = message.chat.id
     try:
-        await call_py.leave_group_call(chat_id)
+        await call_py.leave(chat_id)
         active_calls.discard(chat_id)
         await message.reply_text("⏹ **Stopped and left the Voice Chat.**")
     except Exception as e:
@@ -142,7 +142,7 @@ async def volume_cmd(client: Client, message: Message):
         if volume < 1 or volume > 200:
             await message.reply_text("❌ Volume must be between 1 and 200.")
             return
-        await call_py.change_volume_call(chat_id, volume)
+        await call_py.change_volume(chat_id, volume)
         await message.reply_text(f"🔊 **Volume set to:** `{volume}%`")
     except Exception as e:
         await message.reply_text(f"❌ Error: {str(e)}")
@@ -151,7 +151,7 @@ async def main():
     os.makedirs("downloads", exist_ok=True)
     print("Starting Pyrogram Client...")
     await app.start()
-    print("Starting PyTgCalls...")
+    print("Starting PyTgCalls v3...")
     await call_py.start()
     print("Music Bot is Online and Running!")
     await idle()
